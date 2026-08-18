@@ -40,6 +40,7 @@ for svc in \
     qti_esepowermanager_service_1_1 \
     wfdhdcphalservice \
     wifidisplayhalservice \
+    update_engine \
     rmt_storage \
     tftp_server \
     wfdvndservice \
@@ -68,7 +69,11 @@ for svc in \
     credstore \
     cdsprpcd qcc-trd \
     vendor.qti.qesdk.sysservice \
-    android.hardware.neuralnetworks@1.3-service-qti
+    android.hardware.neuralnetworks@1.3-service-qti \
+    vendor.drm-widevine-hal-1-3 \
+    vendor.drm-clearkey-hal-1-3 \
+    vendor.keymaster-4-1 \
+    vendor.qti.vibrator
 do
     stop_if_present "$svc"
 done
