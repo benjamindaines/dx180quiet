@@ -93,6 +93,33 @@ pm disable --user 0 com.qti.pasrservice \
 
 log "=== boot sweep complete ==="
 
+# --- CPU Scaling ------------------------------------------------------------------------------------
+# Seems as good a place as any to squeeze these in. Tier 1 is complete, but before the loop.
+
+echo 'conservative' > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor
+
+echo 'conservative' > /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu5/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu6/cpufreq/scaling_governor
+echo 'conservative' > /sys/devices/system/cpu/cpu7/cpufreq/scaling_governor
+
+echo '300000' > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu1/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu2/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu3/cpufreq/scaling_min_freq
+
+echo '300000' > /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu5/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu6/cpufreq/scaling_min_freq
+echo '300000' > /sys/devices/system/cpu/cpu7/cpufreq/scaling_min_freq
+
+
+log "=== CPU scaling set ======="
+
+
 # --- Tier 2: screen-off edge watcher ----------------------------------------------------------------
 # Trigger source: debug.tracing.screen_state, set by SurfaceFlinger frame tracing. Display.STATE_OFF = 1,
 # ON = 2.
