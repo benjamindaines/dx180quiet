@@ -1,21 +1,86 @@
 #!/system/bin/sh
-# DX180 Quiet - late_start service stage.
-#
-# Two tiers:
-#   Tier 1 - a one-shot batch of init 'stop' plus 'pm disable-user'. A clean 'stop' persists unless the
-#            service is re-triggered (class_start or an 'on property:' match), so most entries stay down for
-#            the session from this single pass.
-#   Tier 2 - a screen-off edge watcher that re-stops services observed to respawn via property re-trigger,
-#            and (optionally) reaps non-whitelisted applications on each screen-off transition.
 
 MODDIR=${0%/*}
 LOG="$MODDIR/quiet.log"
 
-# Reaper state files. reaper.killed holds the most recent screen-off kill set; reaper.flagged holds
-# packages already reported as respawners during the current boot (dedupe). flagged is reset at boot so a
-# still-misbehaving app re-warns each session.
 KILLED="$MODDIR/reaper.killed"
 FLAGGED="$MODDIR/reaper.flagged"
+
+SERVICES='
+ims_rtp_daemon
+imsqmidaemon
+imsrcsd
+imsdatadaemon
+netmgrd
+port-bridge
+adpl
+dpmd
+dpmQmiMgr
+ssgqmigd
+ipacm
+ipacm-diag
+vendor.qti.esepowermanager
+vendor.qti.hardware.soter
+vendor.qti.hardware.tui_comm
+neuralnetworks_hal_service
+qti_esepowermanager_service_1_1
+wfdhdcphalservice
+wifidisplayhalservice
+update_engine
+rmt_storage
+tftp_server
+wfdvndservice
+traced
+mlid
+tloc_daemon
+traced_probes
+statsd
+incidentd
+soter-1-0
+tui_comm-1-0
+vendor.cdsprpcd
+vendor.dataadpl
+vendor.ims_rtp_daemon
+vendor.imsdatadaemon
+vendor.imsrcsservice
+vendor.imsqmidaemon
+vendor.ipacm
+vendor.ipacm-diag
+vendor.netmgrd
+vendor.port-bridge
+vendor.qcc-trd
+vendor.rmt_storage
+vendor.tftp_server
+vendor.tlocd
+credstore
+cdsprpcd
+qcc-trd
+vendor.qti.qesdk.sysservice
+android.hardware.neuralnetworks
+vendor.drm-widevine-hal-1-3
+vendor.drm-clearkey-hal-1-3
+vendor.keymaster-4-1
+vendor.qti.vibrator
+sensors.qti
+drmserver
+media.extractor
+media.swcodec
+kauditd
+logd
+'
+
+GOOGLE='
+com.android.settings
+com.io.github.muntashirakon.AppManager
+com.google.android.gms.supervision
+com.google.android.gms.location.history
+com.google.android.gms
+com.android.vending
+com.google.android.gsf
+com.cxinventor.file.explorer
+com.android.documentsui
+com.android.location.fused
+'
 
 # Log ring: limit to 256KiB
 [ -f "$LOG" ] && [ "$(stat -c %s "$LOG" 2>/dev/null || echo 0)" -gt 262144 ] && : > "$LOG"
@@ -24,79 +89,20 @@ FLAGGED="$MODDIR/reaper.flagged"
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
 
 stop_if_present() {
-    svc=$1
-    state=$(getprop "init.svc.$svc")
-    if [ -n "$state" ]; then
-        stop "$svc"
-        log "stop: $svc (was $state)"
-    else
-        log "absent: $svc - no init.svc entry; resolve name via discover.sh"
-    fi
+	for svc in $SERVICES; do
+		state=$(getprop "init.svc.$svc")
+		if [ -n "$state" ]; then
+			stop "$svc"
+			log "stop: $svc (was $state)"
+		else
+			log "absent: $svc no init.svc entry; resolve name via discover.sh"
+		fi
+	done
 }
 
-# Boot-complete gate. The Magisk late_start service stage fires before the framework signals boot-complete;
-# issuing 'stop' or driving 'pm' earlier races init bring-up and can wedge the boot. The bounded counter
-# guards against an indefinite wait on a pathological boot.
-i=0
-while [ "$(getprop sys.boot_completed)" != "1" ] && [ "$i" -lt 120 ]; do
-    sleep 1
-    i=$((i + 1))
-done
-# Settle margin: some services register shortly after boot-complete is signalled.
-sleep 5
+while [[ $(getprop service.bootanim.exit) != 1 ]]; do sleep 10; done
 
-log "=== boot sweep start (boot_completed after ${i}s) ==="
-
-for svc in \
-    ims_rtp_daemon imsqmidaemon \
-    imsrcsd imsdatadaemon \
-    netmgrd port-bridge adpl \
-    dpmd dpmQmiMgr \
-    ssgqmigd ipacm ipacm-diag \
-    vendor.qti.esepowermanager@1.1-service \
-    vendor.qti.hardware.soter@1.0-service \
-    vendor.qti.hardware.tui_comm@1.0-service-qti \
-    neuralnetworks_hal_service \
-    qti_esepowermanager_service_1_1 \
-    wfdhdcphalservice \
-    wifidisplayhalservice \
-    update_engine \
-    rmt_storage \
-    tftp_server \
-    wfdvndservice \
-    traced \
-    mlid \
-    tloc_daemon \
-    traced_probes \
-    statsd \
-    incidentd \
-    soter-1-0 \
-    tui_comm-1-0 \
-    vendor.cdsprpcd \
-    vendor.dataadpl \
-    vendor.ims_rtp_daemon \
-    vendor.imsdatadaemon \
-    vendor.imsrcsservice \
-    vendor.imsqmidaemon \
-    vendor.ipacm \
-    vendor.ipacm-diag \
-    vendor.netmgrd \
-    vendor.port-bridge \
-    vendor.qcc-trd \
-    vendor.rmt_storage \
-    vendor.tftp_server \
-    vendor.tlocd \
-    credstore \
-    cdsprpcd qcc-trd \
-    vendor.qti.qesdk.sysservice \
-    android.hardware.neuralnetworks@1.3-service-qti \
-    vendor.drm-widevine-hal-1-3 \
-    vendor.drm-clearkey-hal-1-3 \
-    vendor.keymaster-4-1 \
-    vendor.qti.vibrator
-do
-    stop_if_present "$svc"
-done
+stop_if_present
 
 pm disable --user 0 com.tafayor.killall \
     && log "disabled pkg: com.tafayor.killall" \
@@ -141,122 +147,39 @@ log "=== CPU scaling set ======="
 
 setprop persist.log.tag E
 
-# --- Tier 2: configuration --------------------------------------------------------------------------
-# TIER2: services to re-stop on screen-off (respawners). Space/newline-delimited init service names.
-# APPKILL: 1 enables the screen-off application reaper; 0 disables it. Independent of TIER2.
-# APP_SCOPE: package scope for the reaper. '-3' restricts to third-party packages, which structurally
-#   excludes the system UI surface (SystemUI, system launcher, AOSP IME) as those are platform apps.
-#   Clearing it (APP_SCOPE="") widens to all packages, which then requires the system UI surface to be
-#   present in WHITELIST or it is force-stopped on screen-off.
-# RESPAWN_GRACE: seconds after force-stop before the immediate respawn check.
-# WHITELIST: packages exempt from the reaper. Matched whole. Newline- or space-delimited.
-TIER2="1"
-APPKILL=0
-APP_SCOPE="-3"
-RESPAWN_GRACE=5
-WHITELIST="
-app.symfonik.music.player
-"
-#com.topjohnwu.magisk
-#io.github.muntashirakon.AppManager
-#com.pearlauncher.pearlauncher
-#"
-
-# --- Tier 2: reaper helpers -------------------------------------------------------------------------
-# in_whitelist: whole-token match against WHITELIST. The command substitution collapses newlines to spaces
-# so the case glob matches regardless of delimiter.
-in_whitelist() {
-    case " $(echo $WHITELIST) " in
-        *" $1 "*) return 0 ;;
-        *) return 1 ;;
-    esac
+cookServ() {
+	for svc in $SERVICES; do
+		state=$(getprop init.svc."$svc")
+		[[ $state == "running" ]] && {
+			log "$svc found to be running, stopping it again."
+			stop "$svc"
+			postState=$(getprop init.svc."$svc")
+			log "$svc is now $postState"
+		}
+	done
 }
 
-# is_running: true when a process exists whose name equals the package or begins "package:" (accounts for
-# multi-process apps). Regex metacharacters in the package name are escaped.
-is_running() {
-    rp=$(printf '%s' "$1" | sed 's/[.[]/\\&/g')
-    ps -Ao NAME 2>/dev/null | grep -qE "^$rp(:|$)"
+c=0
+fryApps() {
+	for app in $GOOGLE; do
+		pm disable-until-used "$app"
+		log "$app disabled until use."
+	done
+	c=0
 }
 
-already_flagged() { [ -f "$FLAGGED" ] && grep -qxF "$1" "$FLAGGED"; }
-
-# flag_respawn: records a respawn once per boot with a standing recommendation. A force-stopped app carries
-# the stopped-state flag, so a restart implies a persistent process or an external restart source; such an
-# app will not stay down under this mechanism.
-flag_respawn() {
-    if ! already_flagged "$1"; then
-        log "respawn: $1 restarted $2; recommend disabling, removing, or adding to WHITELIST"
-        echo "$1" >> "$FLAGGED"
-    fi
+darkMode() {
+	while true; do
+		screenState=$(watch -n 30 getprop debug.tracing.screen_state)
+	
+		[[ $screenState == 1 ]] && {
+			cookServ
+			sleep 600
+			c=$((c + 1))
+		}
+		
+		[[ $c == 6 ]] && fryApps
+	done
 }
 
-# app_reap: force-stops running, non-whitelisted, in-scope packages, and reports respawns.
-#   Phase 1 - packages from the prior sweep now running again (restarted during the awake interval).
-#   Phase 2 - force-stop the current running, non-whitelisted set; record it.
-#   Phase 3 - after a grace window, report any of that set already back (instant restarters).
-app_reap() {
-    if [ -f "$KILLED" ]; then
-        while IFS= read -r pkg; do
-            [ -n "$pkg" ] && is_running "$pkg" && flag_respawn "$pkg" "since the previous sweep"
-        done < "$KILLED"
-    fi
-
-    : > "$KILLED.tmp"
-    for pkg in $(pm list packages $APP_SCOPE 2>/dev/null | sed 's/^package://'); do
-        in_whitelist "$pkg" && continue
-        is_running "$pkg" || continue
-        am force-stop --user 0 "$pkg" 2>/dev/null && log "force-stop: $pkg"
-        echo "$pkg" >> "$KILLED.tmp"
-    done
-    mv "$KILLED.tmp" "$KILLED"
-
-    [ -s "$KILLED" ] || return 0
-    sleep "$RESPAWN_GRACE"
-    while IFS= read -r pkg; do
-        [ -n "$pkg" ] && is_running "$pkg" && flag_respawn "$pkg" "within ${RESPAWN_GRACE}s of force-stop"
-    done < "$KILLED"
-}
-
-# --- Tier 2: screen-off edge watcher ----------------------------------------------------------------
-# Trigger source: debug.tracing.screen_state, set by SurfaceFlinger frame tracing. Display.STATE_OFF = 1,
-# ON = 2.
-
-if [ -z "$(getprop debug.tracing.screen_state)" ]; then
-    log "watcher: debug.tracing.screen_state absent; screen-off trigger unavailable, watcher not started"
-    exit 0
-fi
-
-if [ -z "$TIER2" ] && [ "$APPKILL" != "1" ]; then
-    log "watcher: Tier-2 empty and app reaper disabled; watcher not started"
-    exit 0
-fi
-
-sweep() {
-    for svc in $TIER2; do
-        [ -n "$(getprop "init.svc.$svc")" ] && stop "$svc"
-    done
-    [ -n "$TIER2" ] && log "watcher: service sweep fired"
-    [ "$APPKILL" = "1" ] && app_reap
-}
-
-log "watcher: starting screen-off edge trigger"
-(
-    prev=$(getprop debug.tracing.screen_state)
-    while :; do
-        t0=$(date +%s)
-        cur=$(getprop -w debug.tracing.screen_state 2>/dev/null)
-        t1=$(date +%s)
-        [ -z "$cur" ] && cur=$(getprop debug.tracing.screen_state)
-        # Non-blocking -w detection: an immediate return with an unchanged value indicates the wait form is
-        # unsupported; degrade to a poll interval and re-read.
-        if [ "$cur" = "$prev" ] && [ $((t1 - t0)) -lt 2 ]; then
-            sleep 10
-            cur=$(getprop debug.tracing.screen_state)
-        fi
-        if [ "$cur" = "1" ] && [ "$prev" != "1" ]; then
-            sweep
-        fi
-        prev=$cur
-    done
-) &
+darkMode
