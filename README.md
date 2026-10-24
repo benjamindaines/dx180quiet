@@ -2,7 +2,7 @@
 
 *"We do not do these things because they're easy. We do them because we thought they would be easy."*
 
-This magisk module is designed to, basically, the complete opposite of how the Android OS handles CPU affinity and background processes. I may have lost a bit (more) sanity working on this, but it genuinely sounds fantastic, runs a hell of a lot cooler, and has much better battery life. Will only get better from this initial release too! 
+This magisk module is designed to, basically, do the complete opposite of how the Android OS handles CPU affinity and background processes. I may have lost a bit (more) sanity working on this, but it genuinely sounds fantastic, runs a hell of a lot cooler, and has much better battery life. Will only get better from this initial release too! 
 
 https://symfonium.app/ is the fantastic subsonic / navidrome client that I use on this device. It's what it comes configured to use (please share additional configurations) and has been tested with. More importantly, it's a personal recommendation. Well worth the money and the cringe that comes with uses proprietary software.
 
